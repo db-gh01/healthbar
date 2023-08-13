@@ -307,6 +307,11 @@ windower.register_event('incoming chunk', function(id, data, modified, injected,
         debuff_manager:clear()
         enmity_manager:clear()
         action_manager:clear()
+        last_subtarget_index = -1
+        last_target_index = -1
+        set_target_and_subtarget()
+        update_aggro_bars()
+        set_focus('clear')
     end
 end)
 
