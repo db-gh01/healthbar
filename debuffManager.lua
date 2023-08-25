@@ -5,6 +5,9 @@ local DebuffManager = {
         damaging_spell = S{2, 252, 264, 265},
         non_damaging_spell = S{75, 236, 237, 268, 270, 271},
         died = S{6, 20, 97, 113, 406, 605, 646},
+    },
+    same_effect = {
+        [2] = {19}
     }
 }
 
@@ -60,6 +63,11 @@ function DebuffManager.track_debuff_message(self, pdata)
     elseif self.msg_ids.effect_off:contains(msg_id) then
         if self.tracked_debuffs[target_id] then
             self.tracked_debuffs[target_id][effect] = nil
+            if self.same_effect[effect] then
+                for _, v in ipairs(self.same_effect[effect]) do
+                    self.tracked_debuffs[target_id][v] = nil
+                end
+            end
         end
     elseif self.msg_ids.effect_on:contains(msg_id) then
         self:apply_debuff(target_id, effect, nil)
@@ -73,7 +81,7 @@ function DebuffManager.track_debuff_action(self, act)
         if target_is_npc then
             if self.msg_ids.damaging_spell:contains(target.actions[1].message) then
                 local spell = act.param
-                local effect = res.spells[spell].status
+                local effect = res.spells[spell] and res.spells[spell].status or nil
                 if effect then
                     self:apply_debuff(target.id, effect, spell)
                 end
