@@ -151,7 +151,7 @@
                 <distance>
                     <show>true</show>
                     <text>
-                        <font>Consolas</font>
+                        <font>Roboto Condensed</font>
                         <size>15</size>
                     </text>
                     <offset>

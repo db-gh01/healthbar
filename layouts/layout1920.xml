@@ -2,8 +2,8 @@
 <settings>
     <global>
         <target_bar>
-            <width>300</width>
-            <height>12</height>
+            <width>400</width>
+            <height>16</height>
             <images>
                 <frame>
                     <color>
@@ -181,7 +181,7 @@
         </target_bar>
         <aggro_bar>
             <width>180</width>
-            <height>12</height>
+            <height>16</height>
             <images>
                 <frame>
                     <color>
@@ -355,11 +355,11 @@
             </debuff>
             <count>6</count>
             <bottomup>false</bottomup>
-            <itemheight>35</itemheight>
+            <itemheight>40</itemheight>
         </aggro_bar>
         <focustarget_bar>
-            <width>150</width>
-            <height>12</height>
+            <width>250</width>
+            <height>16</height>
             <images>
                 <frame>
                     <color>
@@ -533,8 +533,8 @@
             </debuff>
         </focustarget_bar>
         <subtarget_bar>
-            <width>150</width>
-            <height>12</height>
+            <width>250</width>
+            <height>16</height>
             <images>
                 <frame>
                     <color>
