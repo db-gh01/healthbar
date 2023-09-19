@@ -48,12 +48,12 @@ function initialize()
         return
     end
     layout = T(config.load(layout_file))
-    target_bar = bar.new(layout.target_bar, 'Target Bar')
-    subtarget_bar = bar.new(layout.subtarget_bar, 'Sub Target Bar')
-    focustarget_bar = bar.new(layout.focustarget_bar, 'Focus Target Bar')
+    target_bar = bar.new(settings.target_bar.show, layout.target_bar, 'Target Bar')
+    subtarget_bar = bar.new(settings.subtarget_bar.show, layout.subtarget_bar, 'Sub Target Bar')
+    focustarget_bar = bar.new(settings.focustarget_bar.show, layout.focustarget_bar, 'Focus Target Bar')
     aggro_bars = {}
     for i = 1, layout.aggro_bar.count do
-        aggro_bars[i] = bar.new(layout.aggro_bar, 'Aggro Bars' .. i)
+        aggro_bars[i] = bar.new(settings.aggro_bar.show, layout.aggro_bar, 'Aggro Bars' .. i)
     end
     bar_groups = {
         target_bar = {target_bar},
@@ -72,7 +72,7 @@ function initialize()
     for _, bar in ipairs(bars) do
         bar:predraw()
     end
-    coroutine.sleep(0.5)
+    coroutine.sleep(1)
     for _, bar in ipairs(bars) do
         bar:store_extents()
         bar:postdraw()
@@ -195,6 +195,7 @@ function delayed_update_party_members()
 end
 
 function setup()
+    if not ready then return end
     if setup_mode then
         setup_mode = false
         last_subtarget_index = -1

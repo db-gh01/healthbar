@@ -13,17 +13,26 @@ function Bar.set_party_member_ids(members)
     Bar.party_member_ids = T(members)
 end
 
-function Bar.new(bar_layout, bar_name)
+function Bar.new(settings_show, bar_layout, bar_name)
 
     local o = {}
 
+    o.texts = {}
+    o.images = {}
+    o.auto_widescan_enabled = false
+    o.pos = {x = 0, y = 0}
+
+    if not settings_show then
+        o.enabled = false
+        return setmetatable(o, {__index = Bar})
+    end
+
+    o.enabled = true
     o.layout = {}
     o.mob_id = nil
     o.bar_name = bar_name
     o.visible = false
     o.debuff_ids = S{}
-    o.auto_widescan_enabled = false
-    o.pos = {x = 0, y = 0}
 
     o.layout.width = bar_layout.width
     o.layout.height = bar_layout.height
@@ -41,7 +50,6 @@ function Bar.new(bar_layout, bar_name)
     o.layout.images.arrow = bar_layout.images.arrow
     o.layout.debuff = bar_layout.debuff
 
-    o.images = {}
     o.images.bg_left = images.new({
         pos = {x = 0, y = 0}, visible = true, draggable = false, repeatable = {x = 1, y = 1},
         color = o.layout.images.bg.color,
@@ -101,7 +109,6 @@ function Bar.new(bar_layout, bar_name)
 		})
 	end
 
-    o.texts = {}
     for k, v in pairs({
         name = '${name|(TargetName)}',
         hpp = '${hpp|(100)}%',
@@ -132,14 +139,17 @@ function Bar.destroy(self)
 end
 
 function Bar.enable_auto_widescan(self)
+    if not self.enabled then return end
     self.auto_widescan_enabled = true
 end
 
 function Bar.disable_auto_widescan(self)
+    if not self.enabled then return end
     self.auto_widescan_enabled = false
 end
 
 function Bar.predraw(self)
+    if not self.enabled then return end
     self.images.bg_left:hide()
     self.images.bg_center:hide()
     self.images.bg_right:hide()
@@ -159,6 +169,7 @@ function Bar.predraw(self)
 end
 
 function Bar.store_extents(self)
+    if not self.enabled then return end
     for k in T{'name', 'hpp', 'level', 'action', 'target', 'distance'}:it() do
         if self.layout.texts[k].show then
             self.layout.texts[k].extents = {}
@@ -168,6 +179,7 @@ function Bar.store_extents(self)
 end
 
 function Bar.postdraw(self)
+    if not self.enabled then return end
     for k in T{'name', 'hpp', 'level', 'action', 'target', 'distance'}:it() do
         if self.layout.texts[k].show then
             self.texts[k]:hide()
@@ -188,6 +200,7 @@ end
 function Bar.set_position(self, x, y)
     self.pos.x = x
     self.pos.y = y
+    if not self.enabled then return end
     for k in T{'name', 'hpp', 'level', 'action'}:it() do
         if self.layout.texts[k].show then
             local tx, ty
@@ -244,6 +257,7 @@ function Bar.set_position(self, x, y)
 end
 
 function Bar.show(self)
+    if not self.enabled then return end
     self.images.bg_left:show()
     self.images.bg_center:show()
     self.images.bg_right:show()
@@ -263,6 +277,7 @@ function Bar.show(self)
 end
 
 function Bar.hide(self)
+    if not self.enabled then return end
     self.images.bg_left:hide()
     self.images.bg_center:hide()
     self.images.bg_right:hide()
@@ -281,12 +296,14 @@ function Bar.hide(self)
 end
 
 function Bar.hide_debuff_icons(self)
+    if not self.enabled then return end
     for i = 1, self.layout.debuff.count do
         self.debuff_icons[i]:hide()
     end
 end
 
 function Bar.show_debuff_icons(self, debuff_ids)
+    if not self.enabled then return end
     local i = 1
     for k, id in ipairs(debuff_ids:sort()) do
         if i > self.layout.debuff.count then break end
@@ -300,6 +317,7 @@ function Bar.show_debuff_icons(self, debuff_ids)
 end
 
 function Bar.set_text_color(self, color)
+    if not self.enabled then return end
     for k in T{'name', 'hpp', 'level', 'action'}:it() do
         if self.layout.texts[k].show then
             self.texts[k]:color(color.red, color.green, color.blue)
@@ -308,6 +326,7 @@ function Bar.set_text_color(self, color)
 end
 
 function Bar.setup_dummy(self)
+    if not self.enabled then return end
     self.texts.name.name = self.bar_name
     if self.layout.texts.hpp.show then
         local hpp = math.random(1, 100)
@@ -336,6 +355,7 @@ function Bar.setup_dummy(self)
 end
 
 function Bar.update_all(self)
+    if not self.enabled then return end
     if not self.mob_id then return end
     local mob = windower.ffxi.get_mob_by_id(self.mob_id)
     if not mob then return end
@@ -344,6 +364,7 @@ function Bar.update_all(self)
 end
 
 function Bar.update_frequent(self)
+    if not self.enabled then return end
     if not self.mob_id then return end
     local mob = windower.ffxi.get_mob_by_id(self.mob_id)
     if not mob then return end
@@ -354,6 +375,7 @@ function Bar.update_frequent(self)
 end
 
 function Bar.update_target(self, enmity_manager)
+    if not self.enabled then return end
     if not self.layout.texts.target.show then return end
     if not self.mob_id then return end
 
@@ -392,6 +414,7 @@ function Bar.update_target(self, enmity_manager)
 end
 
 function Bar.update_debuff(self, debuff_manager)
+    if not self.enabled then return end
     if not self.layout.debuff.show then return end
     local debuff_ids = debuff_manager:get_debuff_ids(self.mob_id)
     if self.debuff_ids:equals(debuff_ids) then return end
@@ -400,6 +423,7 @@ function Bar.update_debuff(self, debuff_manager)
 end
 
 function Bar.update_action(self, action_manager)
+    if not self.enabled then return end
     if not self.layout.texts.action.show then return end
     local action = action_manager:get_mob_action(self.mob_id)
     if action then
@@ -414,6 +438,7 @@ function Bar.update_action(self, action_manager)
 end
 
 function Bar.update_level(self, level_manager)
+    if not self.enabled then return end
     if not self.layout.texts.level.show then return end
     if not self.mob_id then return end
     local index = self.mob_id % 0x1000
@@ -434,17 +459,16 @@ function Bar.update_level(self, level_manager)
 end
 
 function Bar.set_mob(self, mob_id)
-    if self.mob_id ~= mob_id then
-        self.mob_id = mob_id
-        if mob_id then
-            local mob = windower.ffxi.get_mob_by_id(mob_id)
-            self.mob_is_monster = (mob and (bit.band(mob.spawn_type, 0x0010) == 0x0010))
-        else
-            self.mob_is_monster = false
-        end
-        self.debuff_ids = S{}
-        self:update_all()
+    if not self.enabled then return end
+    self.mob_id = mob_id
+    if mob_id then
+        local mob = windower.ffxi.get_mob_by_id(mob_id)
+        self.mob_is_monster = (mob and (bit.band(mob.spawn_type, 0x0010) == 0x0010))
+    else
+        self.mob_is_monster = false
     end
+    self.debuff_ids = S{}
+    self:update_all()
 end
 
 function Bar.is_visible(self)
@@ -482,6 +506,7 @@ function Bar.get_name_color_by_type(self, mob)
 end
 
 function Bar.hover(self, x, y)
+    if not self.enabled then return false end
     for k, obj in pairs(self.texts) do
         if obj:hover(x, y) then return true end
     end

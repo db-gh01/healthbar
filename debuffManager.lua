@@ -14,7 +14,7 @@ local DebuffManager = {
 DebuffManager.tracked_debuffs = {}
 
 function DebuffManager.clear(self)
-    self.track_debuffs = {}
+    self.tracked_debuffs = {}
 end
 
 function DebuffManager.get_debuff_ids(self, target_id)
