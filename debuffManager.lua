@@ -5,9 +5,10 @@ local DebuffManager = {
         damaging_spell = S{2, 252, 264, 265},
         non_damaging_spell = S{75, 236, 237, 268, 270, 271},
         died = S{6, 20, 97, 113, 406, 605, 646},
+        no_effect = S{75, 156, 323}
     },
     same_effect = {
-        [2] = {19}
+        [2] = {19, 193},
     }
 }
 
@@ -18,10 +19,10 @@ function DebuffManager.clear(self)
 end
 
 function DebuffManager.get_debuff_ids(self, target_id)
-    local ids = S{}
+    local ids = T{}
     if self.tracked_debuffs[target_id] then
-        for effect, tracked in pairs(self.tracked_debuffs[target_id]) do
-            ids:add(effect)
+        for _, tracked in ipairs(self.tracked_debuffs[target_id]) do
+            ids:append(tracked.buff_id)
         end
     end
     return ids
@@ -30,11 +31,10 @@ end
 function DebuffManager.update_player_buffs(self)
     local player = windower.ffxi.get_player()
     self.tracked_debuffs[player.id] = {}
+    local c = 1
     for _, buff in ipairs(player.buffs) do
-        self.tracked_debuffs[player.id][buff] = {
-            target_id = player.id,
-            effect = buff
-        }
+        self.tracked_debuffs[player.id][c] = {target_id=player.id, buff_id=buff}
+        c = c + 1
     end
 end
 
@@ -43,10 +43,12 @@ function DebuffManager.track_party_buffs(self, data)
         local member_id = data:unpack('I', k * 48 + 5)
         if member_id ~= 0 then
             self.tracked_debuffs[member_id] = {}
+            local c = 1
             for i = 1, 32 do
                 local effect = data:byte(k*48+5+16+i-1) + 256 * (math.floor(data:byte(k*48+5+8 + math.floor((i-1)/4)) / 4^((i-1)%4))%4)
                 if effect ~= 0 and effect ~= 255 then
-                    self.tracked_debuffs[member_id][effect] = {target_id=member_id, effect=effect,}
+                    self.tracked_debuffs[member_id][c] = {target_id=member_id, buff_id=effect,}
+                    c = c + 1
                 end
             end
         end
@@ -58,14 +60,26 @@ function DebuffManager.track_debuff_message(self, pdata)
     local target_id = pdata:unpack('I',0x09)
     local effect = pdata:unpack('I',0x0D)
     if self.msg_ids.died:contains(msg_id) then
-        self.tracked_debuffs[target_id] = {}
+        self.tracked_debuffs[target_id] = nil
         return
     elseif self.msg_ids.effect_off:contains(msg_id) then
         if self.tracked_debuffs[target_id] then
-            self.tracked_debuffs[target_id][effect] = nil
-            if self.same_effect[effect] then
-                for _, v in ipairs(self.same_effect[effect]) do
-                    self.tracked_debuffs[target_id][v] = nil
+            for i = 1, table.getn(self.tracked_debuffs[target_id]) do
+                if self.tracked_debuffs[target_id][i].buff_id == effect then
+                    table.remove(self.tracked_debuffs[target_id], i)
+                    break
+                end
+                if self.same_effect[effect] then
+                    local remove = nil
+                    for _, v in ipairs(self.same_effect[effect]) do
+                        if self.tracked_debuffs[target_id][i].buff_id == v then
+                            remove = i
+                        end
+                    end
+                    if remove then
+                        table.remove(self.tracked_debuffs[target_id], remove)
+                        break
+                    end
                 end
             end
         end
@@ -88,6 +102,9 @@ function DebuffManager.track_debuff_action(self, act)
             elseif self.msg_ids.non_damaging_spell:contains(target.actions[1].message) then
                 local spell = act.param
                 local effect = target.actions[1].param
+                if self.msg_ids.no_effect:contains(target.actions[1].message) then
+                    return
+                end
                 if effect and effect > 0 then
                     self:apply_debuff(target.id, effect, spell)
                 end
@@ -105,7 +122,7 @@ end
 function DebuffManager.apply_debuff(self, target_id, effect, spell)
     if spell then
         local new_overwrites = res.spells[spell].overwrites or {}
-        for effect, tracked in pairs(self.tracked_debuffs[target_id] or {}) do
+        for i, tracked in ipairs(self.tracked_debuffs[target_id] or {}) do
             local tracked_overwrites = tracked.spell and res.spells[tracked.spell].overwrites or {}
             for _, v in ipairs(tracked_overwrites) do
                 if v == spell then
@@ -114,7 +131,7 @@ function DebuffManager.apply_debuff(self, target_id, effect, spell)
             end
             for _, v in ipairs(new_overwrites) do
                 if v == tracked.spell then
-                    self.tracked_debuffs[target_id][effect] = nil
+                    table.remove(self.tracked_debuffs[target_id], i)
                 end
             end
         end
@@ -123,12 +140,12 @@ function DebuffManager.apply_debuff(self, target_id, effect, spell)
     if not self.tracked_debuffs[target_id] then
         self.tracked_debuffs[target_id] = {}
     end
-    self.tracked_debuffs[target_id][effect] = {
+    table.insert(self.tracked_debuffs[target_id], {
         target_id = target_id,
         spell = spell,
-        effect = effect,
+        buff_id = effect,
         time = os.time(),
-    }
+    })
 end
 
 return DebuffManager
