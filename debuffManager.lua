@@ -123,6 +123,9 @@ function DebuffManager.apply_debuff(self, target_id, effect, spell)
     if spell then
         local new_overwrites = res.spells[spell].overwrites or {}
         for i, tracked in ipairs(self.tracked_debuffs[target_id] or {}) do
+            if tracked.buff_id == effect then
+                return
+            end
             local tracked_overwrites = tracked.spell and res.spells[tracked.spell].overwrites or {}
             for _, v in ipairs(tracked_overwrites) do
                 if v == spell then

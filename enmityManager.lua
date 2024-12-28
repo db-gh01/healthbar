@@ -21,31 +21,41 @@ end
 function EnmityManager.track_enmity(self, act, party, callback)
 
     local now = os.clock()
-    if self.tracked_enmities[act.actor_id] then
-        self.tracked_enmities[act.actor_id].last_update = now
-        return
-    end
 
-    local added = false
+    local updated = false
     local actor_is_npc = (act.actor_id > 0x1000000 and act.actor_id % 0x1000 < 0x700)
-    for _, target in ipairs(act.targets) do
-        if not self.tracked_enmities[target.id] then
+    local actor_is_party = party:get_party_member(act.actor_id)
+
+    if actor_is_party then
+        for i, target in ipairs(act.targets) do
             local target_is_npc = (target.id > 0x1000000 and target.id % 0x1000 < 0x700)
-            if party:get_party_member(act.actor_id) and target_is_npc then
-                if self.tracked_enmities[target.id] then
-                    self.tracked_enmities[target.id].last_update = now
-                else
+            if target_is_npc then
+                if not self.tracked_enmities[target.id] then
                     self.tracked_enmities[target.id] = {target_id = act.actor_id, added = now, last_update = now}
-                    added = true
+                    updated = true
+                else
+                    self.tracked_enmities[target.id].last_update = now
                 end
-            end
-            if actor_is_npc and party:get_party_member(target.id) then
-                self.tracked_enmities[act.actor_id] = {target_id = target.id, added = now, last_update = now}
-                added = true
             end
         end
     end
-    if added then
+
+    if actor_is_npc then
+        local target = act.targets[1]
+        if target and party:get_party_member(target.id) then
+            if not self.tracked_enmities[act.actor_id] then
+                self.tracked_enmities[act.actor_id] = {target_id = target.id, added = now, last_update = now}
+                updated = true
+            elseif self.tracked_enmities[act.actor_id].target_id ~= target.id then
+                self.tracked_enmities[act.actor_id] = {target_id = target.id, added = now, last_update = now}
+                updated = true
+            else
+                self.tracked_enmities[act.actor_id].last_update = now
+            end
+        end
+    end
+
+    if updated then
         callback()
     end
 end
