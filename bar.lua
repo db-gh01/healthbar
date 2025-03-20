@@ -30,6 +30,7 @@ function Bar.new(settings_show, bar_layout, bar_name)
     o.enabled = true
     o.layout = {}
     o.mob_id = nil
+    o.mob_index = nil
     o.bar_name = bar_name
     o.visible = false
     o.debuff_ids = S{}
@@ -441,10 +442,11 @@ function Bar.update_level(self, level_manager)
     if not self.enabled then return end
     if not self.layout.texts.level.show then return end
     if not self.mob_id then return end
-    local index = self.mob_id % 0x1000
+    -- local index = self.mob_id % 0x1000
+
     local level = nil
     if self.mob_is_monster then
-        level = level_manager:get_mob_level(index)
+        level = level_manager:get_mob_level(self.mob_index)
         if not level and self.auto_widescan_enabled then
             level_manager:execute_widescan()
         end
@@ -463,6 +465,7 @@ function Bar.set_mob(self, mob_id)
     self.mob_id = mob_id
     if mob_id then
         local mob = windower.ffxi.get_mob_by_id(mob_id)
+        self.mob_index = mob.index
         self.mob_is_monster = (mob and (bit.band(mob.spawn_type, 0x0010) == 0x0010))
     else
         self.mob_is_monster = false

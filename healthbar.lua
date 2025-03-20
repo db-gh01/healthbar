@@ -313,6 +313,9 @@ windower.register_event('incoming chunk', function(id, data, modified, injected,
         set_target_and_subtarget()
         update_aggro_bars()
         set_focus('clear')
+    -- Animation (Despawn)
+    elseif id == 0x038 then
+        level_manager:handle_mob_despawn(data)
     end
 end)
 

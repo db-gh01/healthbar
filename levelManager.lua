@@ -46,6 +46,10 @@ function levelManager.set_mob_level(self, index, level)
     self.mob_level_table[index] = level
 end
 
+function levelManager.remove_mob_level(self, index)
+    self.mob_level_table[index] = nil
+end
+
 function levelManager.clear(self)
     self.mob_level_table:clear()
 end
@@ -66,6 +70,13 @@ function levelManager.handle_incoming_widescan(self, data)
     local p = packets.parse('incoming', data)
     if p['Index'] and p['Level'] then
         self:set_mob_level(p['Index'], p['Level'])
+    end
+end
+
+function levelManager.handle_mob_despawn(self, data)
+    local p = packets.parse('incoming', data)
+    if p['Type'] and p['Type'] == "kesu" and p['Mob Index'] and self.mob_level_table[p['Mob Index']] then
+        self:remove_mob_level(p['Mob Index'])
     end
 end
 
