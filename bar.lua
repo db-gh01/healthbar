@@ -5,6 +5,20 @@ Bar = {}
 Bar.player_id = nil
 Bar.party_member_ids = T{}
 
+local TEXT_KEYS_ALL = {'name', 'hpp', 'level', 'action', 'target', 'distance'}
+local TEXT_KEYS_MAIN = {'name', 'hpp', 'level', 'action'}
+local TEXT_KEYS_VISIBLE_ON_SHOW = {'name', 'hpp', 'distance'}
+
+local NAME_COLORS = {
+    dead = {red = 155, green = 155, blue = 155},
+    player = {red = 255, green = 255, blue = 255},
+    party = {red = 102, green = 255, blue = 255},
+    npc = {red = 150, green = 225, blue = 150},
+    claimed_by_party = {red = 255, green = 130, blue = 130},
+    unclaimed = {red = 230, green = 230, blue = 138},
+    claimed_other = {red = 153, green = 102, blue = 255},
+}
+
 function Bar.set_player_id(id)
     Bar.player_id = id
 end
@@ -34,6 +48,17 @@ function Bar.new(settings_show, bar_layout, bar_name)
     o.bar_name = bar_name
     o.visible = false
     o.debuff_ids = S{}
+    o.debuff_version = -1
+    o.last_hpp = nil
+    o.last_distance_text = nil
+    o.last_name_color_key = nil
+    o.last_target_name = nil
+    o.last_target_color_key = nil
+    o.target_visible = false
+    o.last_action = nil
+    o.action_visible = false
+    o.last_level = nil
+    o.level_visible = false
 
     o.layout.width = bar_layout.width
     o.layout.height = bar_layout.height
@@ -159,7 +184,7 @@ function Bar.predraw(self)
     self.images.frame_right:hide()
     self.images.body:hide()
     self.images.arrow:hide()
-    for k in T{'name', 'hpp', 'level', 'action', 'target', 'distance'}:it() do
+    for _, k in ipairs(TEXT_KEYS_ALL) do
         if self.layout.texts[k].show then
             self.texts[k]:bg_transparency(1)
             self.texts[k]:transparency(1)
@@ -171,7 +196,7 @@ end
 
 function Bar.store_extents(self)
     if not self.enabled then return end
-    for k in T{'name', 'hpp', 'level', 'action', 'target', 'distance'}:it() do
+    for _, k in ipairs(TEXT_KEYS_ALL) do
         if self.layout.texts[k].show then
             self.layout.texts[k].extents = {}
             self.layout.texts[k].extents.x, self.layout.texts[k].extents.y = self.texts[k]:extents()
@@ -181,7 +206,7 @@ end
 
 function Bar.postdraw(self)
     if not self.enabled then return end
-    for k in T{'name', 'hpp', 'level', 'action', 'target', 'distance'}:it() do
+    for _, k in ipairs(TEXT_KEYS_ALL) do
         if self.layout.texts[k].show then
             self.texts[k]:hide()
             self.texts[k]:bg_alpha(self.layout.texts[k].bg.alpha)
@@ -202,16 +227,17 @@ function Bar.set_position(self, x, y)
     self.pos.x = x
     self.pos.y = y
     if not self.enabled then return end
-    for k in T{'name', 'hpp', 'level', 'action'}:it() do
+    local windower_settings = windower.get_windower_settings()
+    for _, k in ipairs(TEXT_KEYS_MAIN) do
         if self.layout.texts[k].show then
             local tx, ty
             if self.layout.texts[k].flags.right then
-                tx = -(windower.get_windower_settings().ui_x_res - self.pos.x) + self.layout.width + self.layout.texts[k].offset.x
+                tx = -(windower_settings.ui_x_res - self.pos.x) + self.layout.width + self.layout.texts[k].offset.x
             else
                 tx = self.pos.x + self.layout.texts[k].offset.x
             end
             if self.layout.texts[k].flags.bottom then
-                ty = -(windower.get_windower_settings().ui_y_res - self.pos.y) - self.layout.texts[k].extents.y + self.layout.texts[k].offset.y
+                ty = -(windower_settings.ui_y_res - self.pos.y) - self.layout.texts[k].extents.y + self.layout.texts[k].offset.y
             else
                 ty = self.pos.y + self.layout.height + self.layout.texts[k].offset.y
             end
@@ -220,7 +246,7 @@ function Bar.set_position(self, x, y)
     end
     if self.layout.texts.distance.show then
         self.texts.distance:pos(
-            -(windower.get_windower_settings().ui_x_res - self.pos.x) + self.layout.texts.distance.offset.x,
+            -(windower_settings.ui_x_res - self.pos.x) + self.layout.texts.distance.offset.x,
             self.pos.y + self.layout.height/2 - self.layout.texts.distance.extents.y/2 + self.layout.texts.distance.offset.y
         )
     end
@@ -266,7 +292,7 @@ function Bar.show(self)
     self.images.frame_center:show()
     self.images.frame_right:show()
     self.images.body:show()
-    for k in T{'name', 'hpp', 'distance'}:it() do
+    for _, k in ipairs(TEXT_KEYS_VISIBLE_ON_SHOW) do
         if self.layout.texts[k].show then
             self.texts[k]:show()
         end
@@ -287,12 +313,15 @@ function Bar.hide(self)
     self.images.frame_right:hide()
     self.images.body:hide()
     self.images.arrow:hide()
-    for k in T{'name', 'hpp', 'level', 'action', 'target', 'distance'}:it() do
+    for _, k in ipairs(TEXT_KEYS_ALL) do
         if self.layout.texts[k].show then
             self.texts[k]:hide()
         end
     end
     self:hide_debuff_icons()
+    self.target_visible = false
+    self.action_visible = false
+    self.level_visible = false
     self.visible = false
 end
 
@@ -319,7 +348,7 @@ end
 
 function Bar.set_text_color(self, color)
     if not self.enabled then return end
-    for k in T{'name', 'hpp', 'level', 'action'}:it() do
+    for _, k in ipairs(TEXT_KEYS_MAIN) do
         if self.layout.texts[k].show then
             self.texts[k]:color(color.red, color.green, color.blue)
         end
@@ -369,10 +398,23 @@ function Bar.update_frequent(self)
     if not self.mob_id then return end
     local mob = windower.ffxi.get_mob_by_id(self.mob_id)
     if not mob then return end
-    self.texts.hpp.hpp = mob.hpp
-    self.images.body:width(self.layout.width * (mob.hpp / 100))
-    self.texts.distance.distance = string.format('%.1f', math.sqrt(mob.distance))
-    self:set_text_color(self:get_name_color_by_type(mob))
+    if self.last_hpp ~= mob.hpp then
+        self.last_hpp = mob.hpp
+        self.texts.hpp.hpp = mob.hpp
+        self.images.body:width(self.layout.width * (mob.hpp / 100))
+    end
+
+    local distance_text = string.format('%.1f', math.sqrt(mob.distance))
+    if self.last_distance_text ~= distance_text then
+        self.last_distance_text = distance_text
+        self.texts.distance.distance = distance_text
+    end
+
+    local color_key = self:get_name_color_key_by_type(mob)
+    if self.last_name_color_key ~= color_key then
+        self.last_name_color_key = color_key
+        self:set_text_color(NAME_COLORS[color_key])
+    end
 end
 
 function Bar.update_target(self, enmity_manager)
@@ -382,12 +424,15 @@ function Bar.update_target(self, enmity_manager)
 
     local target_name = nil
     local target_color = nil
+    local target_color_key = nil
+    local target_mob = nil
     local enmity_target = enmity_manager:get_enmity(self.mob_id)
     if enmity_target and enmity_target.target_id then
-        local target_mob = windower.ffxi.get_mob_by_id(enmity_target.target_id)
+        target_mob = windower.ffxi.get_mob_by_id(enmity_target.target_id)
         if target_mob then
             target_name = target_mob.name
-            target_color = self:get_name_color_by_type(target_mob)
+            target_color_key = self:get_name_color_key_by_type(target_mob)
+            target_color = NAME_COLORS[target_color_key]
         end
     else
         local mob = windower.ffxi.get_mob_by_id(self.mob_id)
@@ -397,43 +442,71 @@ function Bar.update_target(self, enmity_manager)
                 target_mob = windower.ffxi.get_mob_by_index(target_index)
                 if target_mob then
                     target_name = target_mob.name
-                    target_color = self:get_name_color_by_type(target_mob)
+                    target_color_key = self:get_name_color_key_by_type(target_mob)
+                    target_color = NAME_COLORS[target_color_key]
                 end
             end
         end
     end
 
     if target_name then
-        self.texts.target.target = target_name
-        self.texts.target:color(target_color.red, target_color.green, target_color.blue)
-        self.texts.target:show()
-        self.images.arrow:show()
+        if self.last_target_name ~= target_name then
+            self.last_target_name = target_name
+            self.texts.target.target = target_name
+        end
+        if self.last_target_color_key ~= target_color_key then
+            self.last_target_color_key = target_color_key
+            self.texts.target:color(target_color.red, target_color.green, target_color.blue)
+        end
+        if not self.target_visible then
+            self.texts.target:show()
+            self.images.arrow:show()
+            self.target_visible = true
+        end
     else
-        self.texts.target:hide()
-        self.images.arrow:hide()
+        if self.target_visible then
+            self.texts.target:hide()
+            self.images.arrow:hide()
+            self.target_visible = false
+        end
+        self.last_target_name = nil
+        self.last_target_color_key = nil
     end
 end
 
 function Bar.update_debuff(self, debuff_manager)
     if not self.enabled then return end
     if not self.layout.debuff.show then return end
+    local version = debuff_manager:get_debuff_version(self.mob_id)
+    if self.debuff_version == version then
+        return
+    end
+    self.debuff_version = version
     local debuff_ids = debuff_manager:get_debuff_ids(self.mob_id)
     if self.debuff_ids:equals(debuff_ids) then return end
     self.debuff_ids = debuff_ids
     self:show_debuff_icons(self.debuff_ids)
 end
 
-function Bar.update_action(self, action_manager)
+function Bar.update_action(self, action_manager, clock)
     if not self.enabled then return end
     if not self.layout.texts.action.show then return end
-    local action = action_manager:get_mob_action(self.mob_id)
+    local action = action_manager:get_mob_action(self.mob_id, clock)
     if action then
-        self.texts.action.action = action
-        self.texts.action:show()
+        if self.last_action ~= action then
+            self.last_action = action
+            self.texts.action.action = action
+        end
+        if not self.action_visible then
+            self.texts.action:show()
+            self.action_visible = true
+        end
     else
-        if self.texts.action:visible() then
+        if self.action_visible then
+            self.last_action = nil
             self.texts.action.action = ""
             self.texts.action:hide()
+            self.action_visible = false
         end
     end
 end
@@ -453,10 +526,20 @@ function Bar.update_level(self, level_manager)
     end
 
     if level and level > 0 then
-        self.texts.level.level = level
-        self.texts.level:show()
+        if self.last_level ~= level then
+            self.last_level = level
+            self.texts.level.level = level
+        end
+        if not self.level_visible then
+            self.texts.level:show()
+            self.level_visible = true
+        end
     else
-        self.texts.level:hide()
+        if self.level_visible then
+            self.texts.level:hide()
+            self.level_visible = false
+        end
+        self.last_level = nil
     end
 end
 
@@ -465,12 +548,42 @@ function Bar.set_mob(self, mob_id)
     self.mob_id = mob_id
     if mob_id then
         local mob = windower.ffxi.get_mob_by_id(mob_id)
-        self.mob_index = mob.index
+        self.mob_index = mob and mob.index or nil
         self.mob_is_monster = (mob and (bit.band(mob.spawn_type, 0x0010) == 0x0010))
     else
+        self.mob_index = nil
         self.mob_is_monster = false
     end
     self.debuff_ids = S{}
+    self.debuff_version = -1
+    self.last_hpp = nil
+    self.last_distance_text = nil
+    self.last_name_color_key = nil
+
+    if self.layout.texts.target.show then
+        self.texts.target.target = ""
+        self.texts.target:hide()
+        self.images.arrow:hide()
+    end
+    if self.layout.texts.action.show then
+        self.texts.action.action = ""
+        self.texts.action:hide()
+    end
+    if self.layout.texts.level.show then
+        self.texts.level.level = ""
+        self.texts.level:hide()
+    end
+    if self.layout.debuff.show then
+        self:hide_debuff_icons()
+    end
+
+    self.last_target_name = nil
+    self.last_target_color_key = nil
+    self.target_visible = false
+    self.last_action = nil
+    self.action_visible = false
+    self.last_level = nil
+    self.level_visible = false
     self:update_all()
 end
 
@@ -489,22 +602,26 @@ bit 5    Monster
 bit 6    No Nameplate (interactables like Doors, ???, etc)
 ]]
 function Bar.get_name_color_by_type(self, mob)
+    return NAME_COLORS[self:get_name_color_key_by_type(mob)]
+end
+
+function Bar.get_name_color_key_by_type(self, mob)
     if mob.hpp == 0 then
-        return {red = 155, green = 155, blue = 155}
+        return 'dead'
     elseif mob.id == Bar.player_id then
-        return {red = 255, green = 255, blue = 255}
+        return 'player'
     elseif Bar.party_member_ids:contains(mob.id) then
-        return {red = 102, green = 255, blue = 255}
+        return 'party'
     elseif not mob.is_npc then
-        return {red = 255, green = 255, blue = 255}
+        return 'player'
     elseif bit.band(mob.spawn_type, 0x0002) == 2 then
-        return {red = 150, green = 225, blue = 150}
+        return 'npc'
     elseif Bar.party_member_ids:contains(mob.claim_id) then
-        return {red = 255, green = 130, blue = 130}
+        return 'claimed_by_party'
     elseif mob.claim_id == 0 then
-        return {red = 230, green = 230, blue = 138}
-    elseif mob.claim_id ~= 0 then
-        return {red = 153, green = 102, blue = 255}
+        return 'unclaimed'
+    else
+        return 'claimed_other'
     end
 end
 

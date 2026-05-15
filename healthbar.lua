@@ -1,6 +1,6 @@
 _addon.name = 'healthbar'
 _addon.author = 'DB'
-_addon.version = '0.1'
+_addon.version = '0.2'
 _addon.language = 'Japanese'
 _addon.commands = {'healthbar','bar'}
 
@@ -162,26 +162,26 @@ windower.register_event('prerender', function()
     if not ready then return end
     if setup_mode then return end
 
+    local c = os.clock()
+
     set_target_and_subtarget()
     for _, bar in ipairs(bars) do
         if bar:is_visible() then
             bar:update_frequent()
-            bar:update_action(action_manager)
+            bar:update_action(action_manager, c)
             bar:update_target(enmity_manager)
             bar:update_debuff(debuff_manager)
             bar:update_level(level_manager)
         end
     end
 
-    local c = os.clock()
     if c - last_cleanup_enmity_clock > 0.5 then
-        if enmity_manager:cleanup_enmity() then
+        if enmity_manager:cleanup_enmity(c) then
             update_aggro_bars()
         end
         last_cleanup_enmity_clock = c
     end
     if settings.auto_widescan then
-        local c = os.clock()
         if c - last_execute_widescan > 0.5 then
             level_manager:execute_widescan(true)
             last_execute_widescan = c
@@ -287,7 +287,6 @@ windower.register_event('incoming chunk', function(id, data, modified, injected,
     elseif id == 0x028 then
         local act = windower.packets.parse_action(data)
         enmity_manager:track_enmity(act, party_manager, update_aggro_bars)
-        enmity_manager:get_enmity_list()
         action_manager:track_action(act)
         debuff_manager:track_debuff_action(act)
     -- Action Message

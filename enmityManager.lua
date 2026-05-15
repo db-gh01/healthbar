@@ -60,13 +60,14 @@ function EnmityManager.track_enmity(self, act, party, callback)
     end
 end
 
-function EnmityManager.cleanup_enmity(self)
+function EnmityManager.cleanup_enmity(self, now)
+    now = now or os.clock()
     local deleted = false
     for id, enmity in pairs(self.tracked_enmities) do
         local mob = windower.ffxi.get_mob_by_id(id)
         if
             (not mob or mob.hpp == 0 or mob.status == 0 or mob.status == 2 or mob.distance > 2500 or not mob.valid_target) and
-            os.clock() - enmity.last_update > 3
+            now - enmity.last_update > 3
         then
             self.tracked_enmities[id] = nil
             deleted = true
